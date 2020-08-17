@@ -127,6 +127,8 @@ elecciones$vote <- ifelse(elecciones$vote == "Y", 1, 0)
 elecciones$sex <- ifelse(elecciones$sex == "M", 1, 0)
 elecciones <- cbind(elecciones, region_dummy, education_dummy)
 elecciones[c("population", "age", "income")] <- scale(elecciones[c("population", "age", "income")])
+elecciones <- elecciones %>%
+                select(-X)
 set.seed(64)
 train<-sample(1:nrow(elecciones),1800)
 datos_entrenamiento<-elecciones[train,]
@@ -150,6 +152,19 @@ table(resultados, datos_prueba$vote)
 modelo_svm <- svm(vote~., cost=1, data = datos_entrenamiento)
 summary(modelo_svm)
 predicciones <- predict(modelo_svm, datos_prueba)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+predicciones <- ifelse(predicciones > 0.5, 1, 0)
+table(predicciones, datos_prueba$vote)
+```
+9.KNN
+
+```{r knn}
+X_train <- datos_entrenamiento[,-6]
+X_test <- datos_prueba[,-6]
+Y_train <- datos_entrenamiento[, 6]
+Y_test <- datos_prueba[, 6]
+predicciones <- knn(train = X_train, test = X_test, cl = Y_train, k = 1)
 perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
 plot(perf)
 predicciones <- ifelse(predicciones > 0.5, 1, 0)
