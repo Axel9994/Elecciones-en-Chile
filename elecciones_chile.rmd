@@ -29,6 +29,7 @@ library(rpart.plot)
 library(randomForest)
 library(e1071)
 library(varhandle)
+library(h2o)
 ```
 
 
@@ -173,5 +174,86 @@ X_test <- datos_prueba[,-6]
 Y_train <- datos_entrenamiento[, 6]
 Y_test <- datos_prueba[, 6]
 predicciones <- knn(train = X_train, test = X_test, cl = Y_train, k = 1)
-table(predicciones, as.factor(datos_prueba$vote))
+predicciones <- ifelse(predicciones == "1", 1, 0)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+table(predicciones, datos_prueba$vote)
+```
+
+11. Arboles de Decision
+
+```{r arbol de decision}
+arbol <- rpart(vote~., data = datos_entrenamiento)
+rpart.plot(arbol)
+predicciones <- predict(arbol, newdata = datos_prueba)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+predicciones <- ifelse(predicciones > 0.5, 1, 0)
+table(predicciones, datos_prueba$vote)
+```
+
+12. Random Forest
+
+```{r randomForest}
+rf <- randomForest(formula = vote ~ ., data = datos_entrenamiento, ntree = 5)
+predicciones <- predict(rf, newdata = datos_prueba)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+predicciones <- ifelse(predicciones > 0.5, 1, 0)
+table(predicciones, datos_prueba$vote)
+```
+
+13 H2O GBM y Red Neuronal
+```{r h2o}
+h2o.init()
+
+datos_entrenamiento$vote <- as.factor(datos_entrenamiento$vote)
+datos_prueba$vote <- as.factor(datos_prueba$vote)
+
+modelo_gbm <- h2o.gbm(
+  y = "vote",
+  training_frame = as.h2o(datos_entrenamiento),
+  nfolds = 3,
+  seed = 64,
+  keep_cross_validation_predictions = T
+)
+
+rendimiento_gbm <- h2o.performance(modelo_gbm)
+predicciones_gbm <- h2o.predict(modelo_gbm, newdata = as.h2o(datos_prueba))
+
+
+tabla <- h2o.accuracy(rendimiento_gbm)
+tabla <- tabla %>% 
+  arrange(desc(accuracy))
+limite <- tabla$threshold[1]
+predicciones <- ifelse(predicciones_gbm$p1 < limite, 0, 1)
+predicciones <- as.vector(predicciones)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+table(predicciones, datos_prueba$vote)
+
+
+modelo_rn <- h2o.deeplearning(
+  y = "vote",
+  training_frame = as.h2o(datos_entrenamiento),
+  hidden = c(16,16),
+  epochs = 50,
+  train_samples_per_iteration = -1,
+  activation = "Rectifier"
+)
+
+rendimiento_rn <- h2o.performance(modelo_rn)
+predicciones_rn <- h2o.predict(modelo_rn, newdata = as.h2o(datos_prueba))
+
+tabla <- h2o.accuracy(rendimiento_rn)
+tabla <- tabla %>% 
+  arrange(desc(accuracy))
+limite <- tabla$threshold[1]
+predicciones <- ifelse(predicciones_rn$p1 < limite, 0, 1)
+predicciones <- as.vector(predicciones)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+table(predicciones, datos_prueba$vote)
+
+h2o.shutdown(prompt = F)
 ```
