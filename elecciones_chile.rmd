@@ -1,0 +1,146 @@
+---
+title: "Elecciones Chilenas 1988"
+author: "Axel Aleman"
+date: "17/08/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Se analizara la intención de Voto por Edad, Sexo, Ingreso, Nivel de Estudio y Zona de Chile
+
+### Preparación del Entorno
+
+1.Inclusión de Paquetes R
+
+```{r Incluir librerias, echo=TRUE}
+library(ggplot2)
+library(modes)
+library(dplyr)
+library(ROCR)
+library(pscl)
+library(class)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(e1071)
+library(varhandle)
+```
+
+
+2.Cargar Datos de las Elecciones Chilenas
+```{r Carga de Datos, echo=TRUE}
+elecciones_raw<-read.csv("Chile.csv")
+head(elecciones_raw)
+```
+
+
+3.Exploracion de Datos 
+```{r Tipo de Datos, echo=TRUE}
+str(elecciones_raw)
+print('Valores Nulos')
+print('Region')
+table(is.na(elecciones_raw$region))
+print('Población')
+table(is.na(elecciones_raw$population))
+print('Sexo')
+table(is.na(elecciones_raw$sex))
+print('Educación')
+table(is.na(elecciones_raw$education))
+print('Ingreso')
+table(is.na(elecciones_raw$income))
+print('Status Quo')
+table(is.na(elecciones_raw$statusquo))
+print('Voto')
+table(is.na(elecciones_raw$vote))
+```
+
+4. Limpieza de Datos
+
+```{r limpieza de Datos}
+elecciones_raw <- elecciones_raw[!is.na(elecciones_raw$vote), ]
+educacion_vn <- modes(elecciones_raw[elecciones_raw$vote != "Y", c("education")], type = 3)
+educacion_vy <- modes(elecciones_raw[elecciones_raw$vote == "Y", c("education")], type = 3)
+ingreso_vn <- median(elecciones_raw[elecciones_raw$vote != "Y", c("income")], na.rm = T)
+ingreso_vy <- median(elecciones_raw[elecciones_raw$vote == "Y", c("income")], na.rm = T)
+status_vn <- median(elecciones_raw[elecciones_raw$vote != "Y", c("statusquo")], na.rm = T)
+status_vy <- median(elecciones_raw[elecciones_raw$vote == "Y", c("statusquo")], na.rm = T)
+
+elecciones_raw[is.na(elecciones_raw$education) & elecciones_raw$vote != "Y", c("education")] <- educacion_vn[1]
+elecciones_raw[is.na(elecciones_raw$education) & elecciones_raw$vote == "Y", c("education")] <- educacion_vy[1]
+elecciones_raw[is.na(elecciones_raw$income) & elecciones_raw$vote != "Y", c("income")] <- ingreso_vn
+elecciones_raw[is.na(elecciones_raw$income) & elecciones_raw$vote == "Y", c("income")] <- ingreso_vy
+elecciones_raw[is.na(elecciones_raw$statusquo) & elecciones_raw$vote != "Y", c("statusquo")] <- status_vn
+elecciones_raw[is.na(elecciones_raw$statusquo) & elecciones_raw$vote == "Y", c("statusquo")] <- status_vy
+
+print('Valores Nulos')
+print('Region')
+table(is.na(elecciones_raw$region))
+print('Población')
+table(is.na(elecciones_raw$population))
+print('Sexo')
+table(is.na(elecciones_raw$sex))
+print('Educación')
+table(is.na(elecciones_raw$education))
+print('Ingreso')
+table(is.na(elecciones_raw$income))
+print('Status Quo')
+table(is.na(elecciones_raw$statusquo))
+print('Voto')
+table(is.na(elecciones_raw$vote))
+```
+
+### Analisis Exploratorio Descriptivo
+
+5. Analisis Exploratorio
+
+```{r analisisEDA}
+ggplot(elecciones_raw, aes(x=education, fill=vote)) +
+  geom_bar(position = "dodge")
+ggplot(elecciones_raw, aes(x=region, fill=vote)) +
+  geom_bar(position = "dodge")
+ggplot(elecciones_raw, aes(x=population, fill=vote)) +
+  geom_density(alpha=0.5)
+ggplot(elecciones_raw, aes(x=age, fill=vote)) +
+  geom_density(alpha=0.5)
+ggplot(elecciones_raw, aes(x=income, fill=vote)) +
+  geom_density(alpha=0.5)
+ggplot(elecciones_raw, aes(x=statusquo, fill=vote)) +
+  geom_density(alpha=0.5)
+```
+
+### Transformacion de Datos y Modelado
+
+6.Preparación del Modelo
+
+```{r prep_log_reg, echo=TRUE}
+intencion_voto<-ifelse(elecciones$vote=="N",1,0)
+region_central<-ifelse(elecciones$region=="M"|elecciones$region=="SA"|elecciones$region=="C",1,0)
+nivel_primario<-ifelse(elecciones$education=="P",1,0)
+status<-ifelse(elecciones$statusquo>0,1,0)
+sexo<-ifelse(elecciones$sex=="M",1,0)
+elecciones<-cbind(elecciones,sexo,region_central,nivel_primario,status,intencion_voto)
+set.seed(64)
+train<-sample(1:nrow(elecciones),500)
+datos_entrenamiento<-elecciones[train,]
+datos_prueba<-elecciones[-train,]
+modelo<-glm(intencion_voto~sexo+nivel_primario+region_central+status,family = binomial(link = "logit"), data = datos_entrenamiento)
+summary(modelo)
+pR2(modelo)
+```
+
+18.Uso del Modelo para Predicción y Validacion del modelo
+
+```{r log_reg, echo=TRUE}
+resultados<-predict(modelo,newdata=subset(datos_prueba), type="response")
+pr<-prediction(resultados,datos_prueba$intencion_voto)
+prf<-performance(pr, measure="tpr", x.measure="fpr")
+plot(prf)
+auc<-performance(pr, measure="auc")
+precision<-auc@y.values[[1]]
+print(paste('Precision: ',precision))
+```
