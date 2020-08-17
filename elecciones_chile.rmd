@@ -144,4 +144,14 @@ plot(perf)
 resultados <- ifelse(resultados > 0.5, 1, 0)
 table(resultados, datos_prueba$vote)
 ```
+8. SVM
 
+```{r svm, echo=T}
+modelo_svm <- svm(vote~., cost=1, data = datos_entrenamiento)
+summary(modelo_svm)
+predicciones <- predict(modelo_svm, datos_prueba)
+perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+predicciones <- ifelse(predicciones > 0.5, 1, 0)
+table(predicciones, datos_prueba$vote)
+```
