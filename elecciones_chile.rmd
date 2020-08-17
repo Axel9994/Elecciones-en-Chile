@@ -117,30 +117,31 @@ ggplot(elecciones_raw, aes(x=statusquo, fill=vote)) +
 
 6.Preparación del Modelo
 
-```{r prep_log_reg, echo=TRUE}
-intencion_voto<-ifelse(elecciones$vote=="N",1,0)
-region_central<-ifelse(elecciones$region=="M"|elecciones$region=="SA"|elecciones$region=="C",1,0)
-nivel_primario<-ifelse(elecciones$education=="P",1,0)
-status<-ifelse(elecciones$statusquo>0,1,0)
-sexo<-ifelse(elecciones$sex=="M",1,0)
-elecciones<-cbind(elecciones,sexo,region_central,nivel_primario,status,intencion_voto)
+```{r transformacion_datos}
+elecciones <- elecciones_raw
+region_dummy <- to.dummy(elecciones$region, prefix = "region")
+education_dummy <- to.dummy(elecciones$education, prefix = "education")
+elecciones <- elecciones %>%
+              select(-education, -region)
+elecciones$vote <- ifelse(elecciones$vote == "Y", 1, 0)
+elecciones$sex <- ifelse(elecciones$sex == "M", 1, 0)
+elecciones <- cbind(elecciones, region_dummy, education_dummy)
+elecciones[c("population", "age", "income")] <- scale(elecciones[c("population", "age", "income")])
 set.seed(64)
-train<-sample(1:nrow(elecciones),500)
+train<-sample(1:nrow(elecciones),1800)
 datos_entrenamiento<-elecciones[train,]
 datos_prueba<-elecciones[-train,]
-modelo<-glm(intencion_voto~sexo+nivel_primario+region_central+status,family = binomial(link = "logit"), data = datos_entrenamiento)
+```
+
+7.Regresion Logistica
+```{r log_reg, echo=TRUE}
+modelo<-glm(vote~.,family = binomial(link = "logit"), data = datos_entrenamiento)
 summary(modelo)
 pR2(modelo)
-```
-
-18.Uso del Modelo para Predicción y Validacion del modelo
-
-```{r log_reg, echo=TRUE}
 resultados<-predict(modelo,newdata=subset(datos_prueba), type="response")
-pr<-prediction(resultados,datos_prueba$intencion_voto)
-prf<-performance(pr, measure="tpr", x.measure="fpr")
-plot(prf)
-auc<-performance(pr, measure="auc")
-precision<-auc@y.values[[1]]
-print(paste('Precision: ',precision))
+perf <- performance(prediction(resultados, datos_prueba$vote), "tpr", "fpr")
+plot(perf)
+resultados <- ifelse(resultados > 0.5, 1, 0)
+table(resultados, datos_prueba$vote)
 ```
+
