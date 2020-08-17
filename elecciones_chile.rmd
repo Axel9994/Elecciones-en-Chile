@@ -47,6 +47,8 @@ print('Region')
 table(is.na(elecciones_raw$region))
 print('Población')
 table(is.na(elecciones_raw$population))
+print('Edad')
+table(is.na(elecciones_raw$age))
 print('Sexo')
 table(is.na(elecciones_raw$sex))
 print('Educación')
@@ -69,6 +71,8 @@ ingreso_vn <- median(elecciones_raw[elecciones_raw$vote != "Y", c("income")], na
 ingreso_vy <- median(elecciones_raw[elecciones_raw$vote == "Y", c("income")], na.rm = T)
 status_vn <- median(elecciones_raw[elecciones_raw$vote != "Y", c("statusquo")], na.rm = T)
 status_vy <- median(elecciones_raw[elecciones_raw$vote == "Y", c("statusquo")], na.rm = T)
+edad_vn <- median(elecciones_raw[elecciones_raw$vote != "Y", c("age")], na.rm = T)
+edad_vy <- median(elecciones_raw[elecciones_raw$vote == "Y", c("age")], na.rm = T)
 
 elecciones_raw[is.na(elecciones_raw$education) & elecciones_raw$vote != "Y", c("education")] <- educacion_vn[1]
 elecciones_raw[is.na(elecciones_raw$education) & elecciones_raw$vote == "Y", c("education")] <- educacion_vy[1]
@@ -76,12 +80,16 @@ elecciones_raw[is.na(elecciones_raw$income) & elecciones_raw$vote != "Y", c("inc
 elecciones_raw[is.na(elecciones_raw$income) & elecciones_raw$vote == "Y", c("income")] <- ingreso_vy
 elecciones_raw[is.na(elecciones_raw$statusquo) & elecciones_raw$vote != "Y", c("statusquo")] <- status_vn
 elecciones_raw[is.na(elecciones_raw$statusquo) & elecciones_raw$vote == "Y", c("statusquo")] <- status_vy
+elecciones_raw[is.na(elecciones_raw$age) & elecciones_raw$vote != "Y", c("age")] <- edad_vn
+elecciones_raw[is.na(elecciones_raw$age) & elecciones_raw$vote == "Y", c("age")] <- edad_vy
 
 print('Valores Nulos')
 print('Region')
 table(is.na(elecciones_raw$region))
 print('Población')
 table(is.na(elecciones_raw$population))
+print('Edad')
+table(is.na(elecciones_raw$age))
 print('Sexo')
 table(is.na(elecciones_raw$sex))
 print('Educación')
@@ -165,8 +173,5 @@ X_test <- datos_prueba[,-6]
 Y_train <- datos_entrenamiento[, 6]
 Y_test <- datos_prueba[, 6]
 predicciones <- knn(train = X_train, test = X_test, cl = Y_train, k = 1)
-perf <- performance(prediction(predicciones, datos_prueba$vote), "tpr", "fpr")
-plot(perf)
-predicciones <- ifelse(predicciones > 0.5, 1, 0)
-table(predicciones, datos_prueba$vote)
+table(predicciones, as.factor(datos_prueba$vote))
 ```
